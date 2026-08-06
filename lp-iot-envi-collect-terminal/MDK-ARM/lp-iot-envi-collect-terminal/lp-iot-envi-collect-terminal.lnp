@@ -10,6 +10,7 @@
 "lp-iot-envi-collect-terminal\usart.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_it.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_msp.o"
+"lp-iot-envi-collect-terminal\sensor.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_gpio_ex.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_adc.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_adc_ex.o"

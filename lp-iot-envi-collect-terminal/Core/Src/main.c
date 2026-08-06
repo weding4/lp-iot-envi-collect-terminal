@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include "filter.h"
+#include "sensor.h"
 
 /* USER CODE END Includes */
 
@@ -52,8 +53,7 @@
 
 /* USER CODE BEGIN PV */
 
-volatile uint16_t adc_dma_buf[2];   // 存放两个通道的原始值（AD DMA循环填充）
-SlidingFilter temp_filter, light_filter;  // 温度、光照滤波器
+
 
 /* USER CODE END PV */
 
@@ -91,7 +91,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+	
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -111,9 +111,8 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
-	SlidingFilter_Init(&temp_filter);
-	SlidingFilter_Init(&light_filter);
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buf, 2);  // 启动DMA循环采集
+ // 启动DMA循环采集
+	Sensor_Init(); // 模块内部完成：滤波初始化 + HAL_ADC_Start_DMA
 	printf("System Start! ADC DMA running...\r\n");
 
   /* USER CODE END 2 */
@@ -124,34 +123,21 @@ int main(void)
   
   while (1)
   {
-	
+	SensorStatus ts, ls;
+        float temp = Sensor_ReadTemperature(&ts);
+        float light = Sensor_ReadLightPercent(&ls);
 
-	  
-	  //将最新的 DMA 数据送入滑动滤波器
-   SlidingFilter_Update(&temp_filter, adc_dma_buf[0]);   // 温度通道（PA0）
-    SlidingFilter_Update(&light_filter, adc_dma_buf[1]);  // 光照通道（PA1）
+        if (ts == SENSOR_OK)
+            printf("Temp: %.1f C  ", temp);
+        else
+            printf("Temp ERR(%d)  ", ts);
 
-    // 获取滤波后的平均值
-    uint16_t adc_temp = SlidingFilter_GetAvg(&temp_filter);
-    uint16_t adc_light = SlidingFilter_GetAvg(&light_filter);
+        if (ls == SENSOR_OK)
+            printf("Light: %.1f %%\r\n", light);
+        else
+            printf("Light ERR(%d)\r\n", ls);
 
-    // --- 物理量换算（示例，需根据实际电路调整）---
-    // 1. 温度换算（NTC热敏电阻，分压电路，假设上拉电阻10k，VCC=3.3V，B=3950）
-    float v_temp = adc_temp * 3.3f / 4096.0f;
-    float r_ntc = (v_temp * 10000.0f) / (3.3f - v_temp);   // 分压公式求 NTC 电阻
-    float temp_c = 1.0f / (1.0f/298.15f + logf(r_ntc/10000.0f)/3950.0f) - 273.15f;
-
-    // 2. 光照换算（假设光敏电阻分压，无精确曲线时可先线性映射）
-    float v_light = adc_light * 3.3f / 4096.0f;
-    // 这里简单将电压转换为 0~100% 的光强百分比
-    float light_percent = v_light / 3.3f * 100.0f;
-
-    // 通过调试串口打印
-
-    printf("Temp: ADC=%d, %.1f C  |  Light: ADC=%d, %.1f %%\r\n",
-           adc_temp, temp_c, adc_light, light_percent);
-
-    HAL_Delay(500);   // 每500ms打印一次
+        HAL_Delay(500);  // 每500ms打印一次
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
