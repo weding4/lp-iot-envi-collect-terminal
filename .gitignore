@@ -1,0 +1,27 @@
+# Keil编译输出文件夹
+Objects/
+Listings/
+
+# 编译生成文件
+*.axf
+*.hex
+*.bin
+*.map
+*.o
+*.d
+*.crf
+*.lst
+*.plg
+
+# Keil用户本地配置（不提交）
+*.uvoptx
+*.uvopt
+*.uvguix.*
+*.uvgui.*
+
+# CubeMX备份
+*.ioc.bak
+.mxproject/
+
+# VSCode
+.vscode/
