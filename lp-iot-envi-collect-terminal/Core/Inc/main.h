@@ -63,7 +63,7 @@ void Error_Handler(void);
 #define DC_MOTOR_IN1_GPIO_Port GPIOB
 #define DC_MOTOR_IN2_Pin GPIO_PIN_1
 #define DC_MOTOR_IN2_GPIO_Port GPIOB
-#define BUZZER_Pin GPIO_PIN_5
+#define BUZZER_Pin GPIO_PIN_3
 #define BUZZER_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */

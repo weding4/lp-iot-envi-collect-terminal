@@ -32,6 +32,12 @@
 #include "filter.h"
 #include "sensor.h"
 #include "OLED.h"
+#include "servo.h"
+#include "motor.h"
+#include "buzzer.h"
+#include "control.h"
+#include <string.h>   // 提供 strcmp, strncmp
+#include <stdlib.h>   // 提供 atoi
 
 /* USER CODE END Includes */
 
@@ -54,7 +60,7 @@
 
 /* USER CODE BEGIN PV */
 
-
+volatile uint16_t adc_dma_buf[2];
 
 /* USER CODE END PV */
 
@@ -120,6 +126,14 @@ int main(void)
 	OLED_ShowString(0, 0, "Env Monitor");  // 标题
 	HAL_Delay(1000);
 	OLED_Clear();
+	
+	Control_Init();      // 初始化舵机、电机、蜂鸣器
+
+    // 串口命令提示（可选）
+    printf("System ready. Commands:\r\n");
+    printf("  servo <angle>  - set servo angle 0~180\r\n");
+    printf("  motor fwd/stop/rev\r\n");
+    printf("  buzzer on/off/beep\r\n");
 
   /* USER CODE END 2 */
 
@@ -129,32 +143,49 @@ int main(void)
   
   while (1)
   {
-	
-		
-		
-	  
-	  SensorStatus ts, ls;
+	SensorStatus ts, ls;
         float temp = Sensor_ReadTemperature(&ts);
         float light = Sensor_ReadLightPercent(&ls);
-	  
-		if (ts == SENSOR_OK && ls == SENSOR_OK) {
-        OLED_Display_Env(temp, light);
-    } else {
-        OLED_ShowString(0, 1, "Sensor Error");
-    }
-	  
-	  
-       if (ts == SENSOR_OK)
-            printf("Temp: %.1f C  ", temp);
-        else
-            printf("Temp ERR(%d)  ", ts);
 
-        if (ls == SENSOR_OK)
-            printf("Light: %.1f %%\r\n", light);
-        else
-            printf("Light ERR(%d)\r\n", ls);
+        if (ts == SENSOR_OK && ls == SENSOR_OK) {
+            OLED_Display_Env(temp, light);
+            Control_Execute(temp, light);   // 阈值联动
+            printf("Temp:%.1f C Light:%.1f %%\r\n", temp, light);
+        } else {
+            OLED_ShowString(0, 1, "Sensor Error");
+        }
 
-        HAL_Delay(500);  // 每500ms打印一次    
+        // 串口命令解析（简单示例，后续可移至专门任务）
+        static char rx_buf[32];
+        if (HAL_UART_Receive(&huart1, (uint8_t*)rx_buf, sizeof(rx_buf)-1, 10) == HAL_OK) {
+            rx_buf[sizeof(rx_buf)-1] = '\0';
+            // 这里简单处理：判断开头字符串
+            if (strncmp(rx_buf, "servo ", 6) == 0) {
+                uint8_t angle = atoi(rx_buf+6);
+                if (angle <= 180) {
+                    Servo_SetAngle(angle);
+                    printf("Servo set to %d\r\n", angle);
+                }
+            } else if (strcmp(rx_buf, "motor fwd") == 0) {
+                Motor_SetState(MOTOR_FORWARD);
+                printf("Motor forward\r\n");
+            } else if (strcmp(rx_buf, "motor stop") == 0) {
+                Motor_SetState(MOTOR_STOP);
+                printf("Motor stop\r\n");
+            } else if (strcmp(rx_buf, "buzzer on") == 0) {
+                Buzzer_On();
+                printf("Buzzer on\r\n");
+            } else if (strcmp(rx_buf, "buzzer off") == 0) {
+                Buzzer_Off();
+                printf("Buzzer off\r\n");
+            } else if (strcmp(rx_buf, "buzzer beep") == 0) {
+                Buzzer_Beep(200);
+                printf("Buzzer beep\r\n");
+            }
+            // 清空缓冲区（简化处理，实际应使用环形缓冲+DMA）
+        }
+
+        HAL_Delay(500);   // 500ms 周期   
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
