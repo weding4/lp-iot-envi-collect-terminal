@@ -1,6 +1,7 @@
 --cpu Cortex-M3
 "lp-iot-envi-collect-terminal\startup_stm32f103xb.o"
 "lp-iot-envi-collect-terminal\filter.o"
+"lp-iot-envi-collect-terminal\sensor.o"
 "lp-iot-envi-collect-terminal\main.o"
 "lp-iot-envi-collect-terminal\gpio.o"
 "lp-iot-envi-collect-terminal\adc.o"
@@ -10,7 +11,7 @@
 "lp-iot-envi-collect-terminal\usart.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_it.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_msp.o"
-"lp-iot-envi-collect-terminal\sensor.o"
+"lp-iot-envi-collect-terminal\oled.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_gpio_ex.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_adc.o"
 "lp-iot-envi-collect-terminal\stm32f1xx_hal_adc_ex.o"

@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include "filter.h"
 #include "sensor.h"
+#include "OLED.h"
 
 /* USER CODE END Includes */
 
@@ -114,6 +115,11 @@ int main(void)
  // 启动DMA循环采集
 	Sensor_Init(); // 模块内部完成：滤波初始化 + HAL_ADC_Start_DMA
 	printf("System Start! ADC DMA running...\r\n");
+	OLED_Init();          // 初始化 OLED
+	OLED_Clear();
+	OLED_ShowString(0, 0, "Env Monitor");  // 标题
+	HAL_Delay(1000);
+	OLED_Clear();
 
   /* USER CODE END 2 */
 
@@ -123,11 +129,22 @@ int main(void)
   
   while (1)
   {
-	SensorStatus ts, ls;
+	
+		
+		
+	  
+	  SensorStatus ts, ls;
         float temp = Sensor_ReadTemperature(&ts);
         float light = Sensor_ReadLightPercent(&ls);
-
-        if (ts == SENSOR_OK)
+	  
+		if (ts == SENSOR_OK && ls == SENSOR_OK) {
+        OLED_Display_Env(temp, light);
+    } else {
+        OLED_ShowString(0, 1, "Sensor Error");
+    }
+	  
+	  
+       if (ts == SENSOR_OK)
             printf("Temp: %.1f C  ", temp);
         else
             printf("Temp ERR(%d)  ", ts);
@@ -137,7 +154,7 @@ int main(void)
         else
             printf("Light ERR(%d)\r\n", ls);
 
-        HAL_Delay(500);  // 每500ms打印一次
+        HAL_Delay(500);  // 每500ms打印一次    
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

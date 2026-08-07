@@ -429,6 +429,11 @@
               <FilePath>..\Core\Inc\filter.h</FilePath>
             </File>
             <File>
+              <FileName>sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\sensor.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/main.c</FilePath>
@@ -689,9 +694,9 @@
               <FilePath>../Core/Src/stm32f1xx_hal_msp.c</FilePath>
             </File>
             <File>
-              <FileName>sensor.c</FileName>
+              <FileName>OLED.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Core\Src\sensor.c</FilePath>
+              <FilePath>..\Core\Src\OLED.c</FilePath>
             </File>
           </Files>
         </Group>
