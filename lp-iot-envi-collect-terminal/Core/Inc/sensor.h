@@ -12,6 +12,7 @@ typedef enum {
 } SensorStatus;
 
 void Sensor_Init(void);
+void Sensor_ResetFilters(void);
 float Sensor_ReadTemperature(SensorStatus *status);
 float Sensor_ReadLightPercent(SensorStatus *status);
 uint16_t Sensor_GetRawTempADC(void);

@@ -29,15 +29,16 @@
 /* USER CODE BEGIN Includes */
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include "filter.h"
 #include "sensor.h"
 #include "OLED.h"
 #include "servo.h"
 #include "motor.h"
 #include "buzzer.h"
-#include "control.h"
-#include <string.h>   // 提供 strcmp, strncmp
-#include <stdlib.h>   // 提供 atoi
+#include "control.h"  // 提供 atoi
+#include "bsp_key.h"
 
 /* USER CODE END Includes */
 
@@ -62,16 +63,73 @@
 
 volatile uint16_t adc_dma_buf[2];
 
+// 串口中断接收相关
+#define RX_BUF_SIZE 64
+uint8_t rx_buf[RX_BUF_SIZE];
+uint8_t rx_index = 0;
+volatile uint8_t rx_cmd_ready = 0;   // 收到完整一行命令
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 
+
 int fputc(int ch, FILE *f)
 {
     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 10);
     return ch;
+}
+
+void ProcessCommand(uint8_t *cmd)
+{
+    if (strncmp((char *)cmd, "servo ", 6) == 0) {
+        int angle = atoi((char *)cmd + 6);
+        if (angle >= 0 && angle <= 180) {
+            Servo_SetAngle((uint8_t)angle);
+            printf("Servo set to %d\r\n", angle);
+        }
+    } else if (strcmp((char *)cmd, "motor fwd") == 0) {
+        Motor_SetState(MOTOR_FORWARD);
+        printf("Motor forward\r\n");
+    } else if (strcmp((char *)cmd, "motor stop") == 0) {
+        Motor_SetState(MOTOR_STOP);
+        printf("Motor stop\r\n");
+    } else if (strcmp((char *)cmd, "motor rev") == 0) {
+        Motor_SetState(MOTOR_REVERSE);
+        printf("Motor reverse\r\n");
+    } else if (strcmp((char *)cmd, "buzzer on") == 0) {
+        Buzzer_On();
+        printf("Buzzer on\r\n");
+    } else if (strcmp((char *)cmd, "buzzer off") == 0) {
+        Buzzer_Off();
+        printf("Buzzer off\r\n");
+    } else if (strcmp((char *)cmd, "buzzer beep") == 0) {
+        Buzzer_Beep(200);
+        printf("Buzzer beep\r\n");
+    } else {
+        printf("Unknown cmd: %s\r\n", cmd);
+    }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart == &huart1) {
+        if (rx_buf[rx_index] == '\r' || rx_buf[rx_index] == '\n') {
+            rx_buf[rx_index] = '\0';          // 终止字符串
+            if (rx_index > 0) {
+                rx_cmd_ready = 1;             // 通知主循环处理
+            }
+            rx_index = 0;
+        } else {
+            rx_index++;
+            if (rx_index >= RX_BUF_SIZE - 1) {
+                rx_index = 0;                 // 溢出保护
+            }
+        }
+        HAL_UART_Receive_IT(&huart1, &rx_buf[rx_index], 1); // 重新启动接收下一个字节
+    }
 }
 
 /* USER CODE END PFP */
@@ -129,7 +187,8 @@ int main(void)
 	
 	Control_Init();      // 初始化舵机、电机、蜂鸣器
 
-    // 串口命令提示（可选）
+     // 启动串口中断接收
+    HAL_UART_Receive_IT(&huart1, &rx_buf[0], 1);
     printf("System ready. Commands:\r\n");
     printf("  servo <angle>  - set servo angle 0~180\r\n");
     printf("  motor fwd/stop/rev\r\n");
@@ -147,51 +206,38 @@ int main(void)
         float temp = Sensor_ReadTemperature(&ts);
         float light = Sensor_ReadLightPercent(&ls);
 
-        if (ts == SENSOR_OK && ls == SENSOR_OK) {
+        if (ts == SENSOR_OK && ls == SENSOR_OK)
+		{
             OLED_Display_Env(temp, light);
-            Control_Execute(temp, light);   // 阈值联动
+            Control_Execute(temp, light);
             printf("Temp:%.1f C Light:%.1f %%\r\n", temp, light);
-        } else {
+        }
+		else 
+		{
             OLED_ShowString(0, 1, "Sensor Error");
         }
 
-        // 串口命令解析（简单示例，后续可移至专门任务）
-        static char rx_buf[32];
-        if (HAL_UART_Receive(&huart1, (uint8_t*)rx_buf, sizeof(rx_buf)-1, 10) == HAL_OK) {
-            rx_buf[sizeof(rx_buf)-1] = '\0';
-            // 这里简单处理：判断开头字符串
-            if (strncmp(rx_buf, "servo ", 6) == 0) {
-                uint8_t angle = atoi(rx_buf+6);
-                if (angle <= 180) {
-                    Servo_SetAngle(angle);
-                    printf("Servo set to %d\r\n", angle);
-                }
-            } else if (strcmp(rx_buf, "motor fwd") == 0) {
-                Motor_SetState(MOTOR_FORWARD);
-                printf("Motor forward\r\n");
-            } else if (strcmp(rx_buf, "motor stop") == 0) {
-                Motor_SetState(MOTOR_STOP);
-                printf("Motor stop\r\n");
-            } else if (strcmp(rx_buf, "buzzer on") == 0) {
-                Buzzer_On();
-                printf("Buzzer on\r\n");
-            } else if (strcmp(rx_buf, "buzzer off") == 0) {
-                Buzzer_Off();
-                printf("Buzzer off\r\n");
-            } else if (strcmp(rx_buf, "buzzer beep") == 0) {
-                Buzzer_Beep(200);
-                printf("Buzzer beep\r\n");
-            }
-            // 清空缓冲区（简化处理，实际应使用环形缓冲+DMA）
+        // 处理串口命令
+      if (rx_cmd_ready) 
+		{
+            rx_cmd_ready = 0;
+            ProcessCommand(rx_buf);
         }
-
-        HAL_Delay(500);   // 500ms 周期   
+		if (BSP_Key_IsPressed())
+{
+    printf("Key pressed!\r\n");
+}
+        // 这里可以添加模式切换或唤醒操作
+		HAL_Delay(200);   // 5Hz 循环 
+  
+  }
+   
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-}
+
 
 /**
   * @brief System Clock Configuration

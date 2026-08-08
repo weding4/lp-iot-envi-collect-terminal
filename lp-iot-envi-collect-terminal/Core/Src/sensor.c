@@ -96,6 +96,11 @@ float Sensor_ReadLightPercent(SensorStatus *status)
     return (float)f * 100.0f / ADC_MAX;
 }
 
+void Sensor_ResetFilters(void)
+{
+    SlidingFilter_Init(&temp_filter);
+    SlidingFilter_Init(&light_filter);
+}
 
 //uint16_t Sensor_GetRawTempADC(void)  { return adc_dma_buf[0]; }
 //uint16_t Sensor_GetRawLightADC(void) { return adc_dma_buf[1]; }
