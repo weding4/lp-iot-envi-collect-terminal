@@ -4,30 +4,36 @@
 
 void Buzzer_Init(void)
 {
-    // 1. ³¹µ×ÊÍ·Å JTAG£¬È·±£ PB3/PB4/PA15 ¿ÉÓÃ×÷ÆÕÍ¨ GPIO
+    // 1. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í·ï¿½ JTAGï¿½ï¿½È·ï¿½ï¿½ PB3/PB4/PA15 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¨ GPIO
     __HAL_RCC_AFIO_CLK_ENABLE();
-    __HAL_AFIO_REMAP_SWJ_NOJTAG();   // Ö»±£Áô SWD (PA13/PA14)
+    __HAL_AFIO_REMAP_SWJ_NOJTAG();   // Ö»ï¿½ï¿½ï¿½ï¿½ SWD (PA13/PA14)
 
-    // 2. Ç¿ÖÆ¶¨ÖÆ·äÃùÆ÷Òý½ÅÅäÖÃ£¨·ÀÖ¹ CubeMX ÅäÖÃ±»¸²¸Ç£©
+    // 2. Ç¿ï¿½Æ¶ï¿½ï¿½Æ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½Ö¹ CubeMX ï¿½ï¿½ï¿½Ã±ï¿½ï¿½ï¿½ï¿½Ç£ï¿½
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = BUZZER_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;   // ÏÂÀ­£¬ÉÏµçË²¼äµÍµçÆ½
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½Ë²ï¿½ï¿½Íµï¿½Æ½
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(BUZZER_GPIO_Port, &GPIO_InitStruct);
 
-    // 3. È·±£³õÊ¼×´Ì¬Îª¹Ø±Õ
+    // 3. È·ï¿½ï¿½ï¿½ï¿½Ê¼×´Ì¬Îª idle: ï¿½ï¿½ï¿½ßµï¿½Æ½
+    // ï¿½ï¿½ï¿½Ý±ï¿½Æ¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Æ½ï¿½ï¿½Ð§ï¿½ï¿½ï¿½ï¿½ï¿½ï£¬ï¿½Ë£ï¿½ï¿½ï¿½Æ½=ï¿½ï¿½Ê±=ï¿½ï¿½
     Buzzer_Off();
 }
 
+/**
+  * @brief  Generate an active-low buzzer alarm.
+  *         The idle state is high (GPIO_SET). When a threshold violation
+  *         is latched, this routine pulls the output low to turn the buzzer on.
+  */
 void Buzzer_On(void)
 {
-    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
 }
 
 void Buzzer_Off(void)
 {
-    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
 }
 
 void Buzzer_Beep(uint16_t ms)

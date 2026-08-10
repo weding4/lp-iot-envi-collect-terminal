@@ -15,6 +15,7 @@ void Sensor_Init(void);
 void Sensor_ResetFilters(void);
 float Sensor_ReadTemperature(SensorStatus *status);
 float Sensor_ReadLightPercent(SensorStatus *status);
+float Sensor_ReadLightLux(SensorStatus *status);
 uint16_t Sensor_GetRawTempADC(void);
 uint16_t Sensor_GetRawLightADC(void);
 

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 #include "adc.h"
 #include "dma.h"
 #include "i2c.h"
@@ -31,6 +32,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "filter.h"
 #include "sensor.h"
 #include "OLED.h"
@@ -39,6 +41,10 @@
 #include "buzzer.h"
 #include "control.h"  // 提供 atoi
 #include "bsp_key.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -61,6 +67,7 @@
 
 /* USER CODE BEGIN PV */
 
+volatile uint8_t key_pressed = 0;
 volatile uint16_t adc_dma_buf[2];
 
 // 串口中断接收相关
@@ -69,10 +76,27 @@ uint8_t rx_buf[RX_BUF_SIZE];
 uint8_t rx_index = 0;
 volatile uint8_t rx_cmd_ready = 0;   // 收到完整一行命令
 
+typedef struct {
+    float temperature_c;
+    float light_percent;
+    uint16_t light_lx;
+    SensorStatus temp_status;
+    SensorStatus light_status;
+    bool alarm_active;
+    uint8_t alarm_count;
+} sensor_data_t;
+
+sensor_data_t sensor_data;
+osMutexId_t sensor_data_mutex;
+osSemaphoreId_t display_sem;
+osSemaphoreId_t data_sem;
+osMutexId_t printf_mutex;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -82,7 +106,7 @@ int fputc(int ch, FILE *f)
     return ch;
 }
 
-void ProcessCommand(uint8_t *cmd)
+/*void ProcessCommand(uint8_t *cmd)
 {
     if (strncmp((char *)cmd, "servo ", 6) == 0) {
         int angle = atoi((char *)cmd + 6);
@@ -111,7 +135,7 @@ void ProcessCommand(uint8_t *cmd)
     } else {
         printf("Unknown cmd: %s\r\n", cmd);
     }
-}
+}*/
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -131,6 +155,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         HAL_UART_Receive_IT(&huart1, &rx_buf[rx_index], 1); // 重新启动接收下一个字节
     }
 }
+
+void vTask_Acquisition(void *argument);
+void vTask_Control(void *argument);
+void vTask_Cloud(void *argument);
+void vTask_Display(void *argument);
+
 
 /* USER CODE END PFP */
 
@@ -174,35 +204,96 @@ int main(void)
   MX_TIM1_Init();
   MX_USART2_UART_Init();
   MX_USART1_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+
+  BSP_Key_Init();
 
  // 启动DMA循环采集
 	Sensor_Init(); // 模块内部完成：滤波初始化 + HAL_ADC_Start_DMA
+	
 	printf("System Start! ADC DMA running...\r\n");
+	
 	OLED_Init();          // 初始化 OLED
 	OLED_Clear();
-	OLED_ShowString(0, 0, "Env Monitor");  // 标题
+	OLED_ShowString(0, 0, "RTOS Tasks");  // 标题
 	HAL_Delay(1000);
 	OLED_Clear();
-	
 	Control_Init();      // 初始化舵机、电机、蜂鸣器
 
      // 启动串口中断接收
-    HAL_UART_Receive_IT(&huart1, &rx_buf[0], 1);
-    printf("System ready. Commands:\r\n");
-    printf("  servo <angle>  - set servo angle 0~180\r\n");
-    printf("  motor fwd/stop/rev\r\n");
-    printf("  buzzer on/off/beep\r\n");
+   // HAL_UART_Receive_IT(&huart1, &rx_buf[0], 1);
+	printf("FreeRTOS Task framework started.\r\n");
+	
+
+osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+
+ 
+ 
+// 同步对象创建
+
+sensor_data_mutex = osMutexNew(NULL);
+display_sem = osSemaphoreNew(1, 0, NULL);   // 初始计数 0，显示任务等待第一次采集
+data_sem = display_sem;
+printf_mutex = osMutexNew(NULL);
+	
+	
+// 创建四个核心任务
+	
+osThreadAttr_t attr;
+
+// 控制任务 (最高优先级)
+attr.name = "Control";
+attr.attr_bits = 0;
+attr.cb_mem = NULL;
+attr.cb_size = 0;
+attr.stack_mem = NULL;
+attr.stack_size = 512;
+attr.priority = osPriorityAboveNormal;
+osThreadId_t ctrl_id = osThreadNew(vTask_Control, NULL, &attr);
+if (ctrl_id == NULL) {
+    printf("Failed to create Control task!\r\n");
+}
+
+// 采集任务 (Normal)
+attr.name = "Acquisition";
+attr.priority = osPriorityNormal;
+attr.stack_size = 512;
+osThreadNew(vTask_Acquisition, NULL, &attr);
+
+// 云通信任务 (Normal)
+attr.name = "Cloud";
+attr.stack_size = 512;   // 后续 MQTT 需要较大栈
+osThreadNew(vTask_Cloud, NULL, &attr);
+
+// 显示任务 (最低优先级)
+attr.name = "Display";
+attr.stack_size = 512;
+attr.priority = osPriorityLow;
+osThreadNew(vTask_Display, NULL, &attr);
+
+ MX_FREERTOS_Init();
+
+	
 
   /* USER CODE END 2 */
+
+  /* Init scheduler */
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
  
-  
+ // 裸机循环已被 FreeRTOS 替代，保留空循环防止 main 退出（其实不会执行到这里） 
   while (1)
   {
-	SensorStatus ts, ls;
+	/*SensorStatus ts, ls;
         float temp = Sensor_ReadTemperature(&ts);
         float light = Sensor_ReadLightPercent(&ls);
 
@@ -230,14 +321,18 @@ int main(void)
         // 这里可以添加模式切换或唤醒操作
 		HAL_Delay(200);   // 5Hz 循环 
   
-  }
+  }    */
+  
+  
+  
+  
    
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-
+}
 
 /**
   * @brief System Clock Configuration
@@ -286,8 +381,222 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin != GPIO_PIN_4)
+    {
+        return;
+    }
+
+    /* Software debounce: ignore bounces within 50ms of the last accepted press. */
+    static uint32_t last_press_tick = 0U;
+    uint32_t now = HAL_GetTick();
+    if ((now - last_press_tick) < 50U)
+    {
+        return;
+    }
+    last_press_tick = now;
+
+    /* Speed stepping is only valid while the motor is running. */
+    if (motor_duty == 0U)
+    {
+        return;
+    }
+
+    /* Cycle: 25% -> 50% -> 75% -> 100% -> 25%. */
+    switch (motor_duty)
+    {
+        case 25U:  motor_duty = 50U;  break;
+        case 50U:  motor_duty = 75U;  break;
+        case 75U:  motor_duty = 100U; break;
+        case 100U: motor_duty = 25U;  break;
+        default:   motor_duty = 25U;  break;
+    }
+
+    Motor_SetSpeed(motor_duty);
+    printf("[KEY] Motor duty -> %u%%\r\n", motor_duty);
+}
+
+void vTask_Acquisition(void *argument)
+{
+    (void)argument;
+
+    // 前期等待传感器稳定
+    osDelay(100);
+
+    for(;;)
+    {
+        // 若 DMA 缓冲区连续 3 次为 0，则强制重启 DMA
+        static uint8_t zero_cnt = 0;
+        if (adc_dma_buf[0] == 0 && adc_dma_buf[1] == 0) {
+            zero_cnt++;
+            if (zero_cnt >= 3) {
+                // 重新初始化 DMA
+                HAL_ADC_Stop_DMA(&hadc1);
+                HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buf, 2);
+                zero_cnt = 0;
+            }
+        } else {
+            zero_cnt = 0;
+        }
+
+        SensorStatus ts, ls;
+        float temp = Sensor_ReadTemperature(&ts);
+        float light_percent = Sensor_ReadLightPercent(&ls);
+        float light_lx_value = Sensor_ReadLightLux(&ls);
+        uint16_t light_lx = (uint16_t)light_lx_value;
+
+        // 采集结果写入全局结构体并用信号量通知显示任务
+        osMutexAcquire(sensor_data_mutex, osWaitForever);
+        sensor_data.temperature_c = temp;
+        sensor_data.light_percent = light_percent;
+        sensor_data.light_lx = light_lx;
+        sensor_data.temp_status = ts;
+        sensor_data.light_status = ls;
+        sensor_data.alarm_count = 0;
+        osMutexRelease(sensor_data_mutex);
+
+        osSemaphoreRelease(display_sem);
+
+        // 500ms 一次把采集结果按要求打印成单行格式
+        osMutexAcquire(printf_mutex, osWaitForever);
+        printf("Temp: ADC=%u, %.1f C  |  Light: ADC=%u, %.1f %%\r\n",
+               adc_dma_buf[0],
+               temp,
+               adc_dma_buf[1],
+               light_percent);
+        osMutexRelease(printf_mutex);
+
+        osDelay(200);
+    }
+}
+
+void vTask_Control(void *argument)
+{
+    (void)argument;
+
+    for(;;) {
+        float temp;
+        float light_percent;
+
+        osMutexAcquire(sensor_data_mutex, osWaitForever);
+        temp = sensor_data.temperature_c;
+        light_percent = sensor_data.light_percent;
+        osMutexRelease(sensor_data_mutex);
+
+        if (BSP_Key_IsPressed()) {
+            printf("Key pressed!\r\n");
+            key_pressed = 0;
+
+            /* First press: force alarm latch active.
+               Second press in the same state toggles it back to idle.
+               The manual latch is visible to the control task and uses the
+               requested actuator semantics: buzzer ON, motor FORWARD, servo 0°;
+               the release path shuts all three off and returns servo to mid. */
+            static bool manual_alarm = false;
+            manual_alarm = !manual_alarm;
+            Control_ManualOverride(manual_alarm);
+        }
+
+        Control_Execute(temp, light_percent);
+
+        bool manual_alarm_active = Control_IsManualAlarmActive();
+        bool threshold_alarm = ((temp > TEMP_THRESHOLD) || (light_percent > LIGHT_THRESHOLD));
+        bool combined_alarm = manual_alarm_active || threshold_alarm;
+
+        osMutexAcquire(sensor_data_mutex, osWaitForever);
+        sensor_data.alarm_active = combined_alarm;
+        sensor_data.alarm_count = (uint8_t)(combined_alarm ? 2 : 0);
+        osMutexRelease(sensor_data_mutex);
+
+        osDelay(200);
+    }
+}
+
+void vTask_Cloud(void *argument)
+{
+	  
+	
+    for(;;)
+    {
+        osMutexAcquire(printf_mutex, osWaitForever);
+		printf("[CLOUD] Cloud task running\r\n");
+		osMutexRelease(printf_mutex);
+		
+        osDelay(2000);
+    }
+}
+
+void vTask_Display(void *argument)
+{
+    (void)argument;
+
+    for(;;) {
+        osSemaphoreAcquire(display_sem, osWaitForever);
+
+        float temp;
+        float light_percent;
+        bool alarm;
+        SensorStatus temp_status;
+        SensorStatus light_status;
+
+        osMutexAcquire(sensor_data_mutex, osWaitForever);
+        temp = sensor_data.temperature_c;
+        light_percent = sensor_data.light_percent;
+        alarm = sensor_data.alarm_active;
+        temp_status = sensor_data.temp_status;
+        light_status = sensor_data.light_status;
+        osMutexRelease(sensor_data_mutex);
+
+        char line1[16];
+        char line2[16];
+        char line3[16];
+
+        if (temp_status == SENSOR_OK && light_status == SENSOR_OK) {
+            snprintf(line1, sizeof(line1), "Temp:%.1f C", temp);
+            snprintf(line2, sizeof(line2), "Light:%.1f %%", light_percent);
+            snprintf(line3, sizeof(line3), "%s", alarm ? "Alarm" : "Normal");
+        } else {
+            snprintf(line1, sizeof(line1), "Temp:Error");
+            snprintf(line2, sizeof(line2), "Light:Error");
+            snprintf(line3, sizeof(line3), "Sensor Error");
+        }
+
+        /* Keep the OLED memory stable and refresh only the text rows.
+           Avoid calling OLED_Clear() here, otherwise the panel blinks. */
+        OLED_ShowString(0, 0, line1);
+        OLED_ShowString(0, 1, line2);
+        OLED_ShowString(0, 2, line3);
+
+        osDelay(500);
+    }
+}
+
+
 
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM2 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM2)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.

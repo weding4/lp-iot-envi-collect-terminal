@@ -2,32 +2,23 @@
 #define __OLED_H
 
 #include <stdint.h>
+#include "i2c.h"
 
-// OLED 初始化
+extern I2C_HandleTypeDef hi2c1;
+
+#define OLED_I2C_ADDR  0x78U
+#define OLED_WIDTH     128U
+#define OLED_HEIGHT    64U
+#define OLED_PAGE_COUNT 8U
+
 void OLED_Init(void);
-
-// 清屏
 void OLED_Clear(void);
-
-// 全屏填充
-void OLED_Fill(unsigned char fill_Data);
-
-// 设置光标位置（页地址 0~7，列地址 0~127）
-void OLED_SetPos(unsigned char x, unsigned char y);
-
-// 显示一个字符 (6x8)
-void OLED_ShowChar(unsigned char x, unsigned char y, unsigned char chr);
-
-// 显示字符串
-void OLED_ShowString(unsigned char x, unsigned char y, const char *str);
-
-// 显示数字（直接转字符串）
-void OLED_ShowNum(unsigned char x, unsigned char y, int num, unsigned char len);
-
-// 显示浮点数（保留 1 位小数）
-void OLED_ShowFloat(unsigned char x, unsigned char y, float num);
-
-// 显示 ADC 采集数据界面
+void OLED_Fill(uint8_t fill_Data);
+void OLED_SetPos(uint8_t x, uint8_t y);
+void OLED_ShowChar(uint8_t x, uint8_t y, uint8_t chr);
+void OLED_ShowString(uint8_t x, uint8_t y, const char *str);
+void OLED_ShowNum(uint8_t x, uint8_t y, int num, uint8_t len);
+void OLED_ShowFloat(uint8_t x, uint8_t y, float num);
 void OLED_Display_Env(float temp, float light);
 
 #endif

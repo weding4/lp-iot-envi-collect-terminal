@@ -3,7 +3,7 @@
 #include "adc.h"
 #include <math.h>
 
-// Ó²¼þ²ÎÊý
+// Ó²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 #define VCC          3.3f
 #define ADC_MAX      4095.0f
 #define R_FIXED      10000.0f
@@ -11,23 +11,26 @@
 #define NTC_B        3950.0f
 #define T0           298.15f
 
-// »º³åÇø·ÅÄ£¿éÄÚ²¿£¬DMAÒªÇó4×Ö½Ú¶ÔÆë
-static volatile uint16_t adc_dma_buf[2] __attribute__((aligned(4)));
+// Ê¹ï¿½ï¿½ main.c ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½ DMA ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½ï¿½
+extern volatile uint16_t adc_dma_buf[2];
+
 static SlidingFilter temp_filter;
 static SlidingFilter light_filter;
 static uint8_t init_flag = 0;
 
 void Sensor_Init(void)
 {
-    if(init_flag != 0)
+    if (init_flag != 0)
     {
-        return; // ·ÀÖ¹ÖØ¸´³õÊ¼»¯¡¢ÖØ¸´Æô¶¯DMA
+        return; // ï¿½ï¿½Ö¹ï¿½Ø¸ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½
     }
 
     SlidingFilter_Init(&temp_filter);
     SlidingFilter_Init(&light_filter);
 
-    // Æô¶¯ADC DMAÑ­»·²É¼¯£¬Ä£¿éÄÚ²¿Íê³É
+    // Í£Ö¹ï¿½ï¿½ï¿½Ü´ï¿½ï¿½Úµï¿½ DMA ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½Ñ­ï¿½ï¿½Ä£Ê½ï¿½ï¿½Ð§ï¿½ï¿½
+    HAL_ADC_Stop_DMA(&hadc1);
+    HAL_Delay(1);
     HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buf, 2);
 
     init_flag = 1;
@@ -93,7 +96,34 @@ float Sensor_ReadLightPercent(SensorStatus *status)
         return 100.0f;
     }
     *status = SENSOR_OK;
+
+    /* Convert the filtered raw ADC light sample to a normalized percentage.
+       This is a physical light ratio only; it is not yet final lux. */
     return (float)f * 100.0f / ADC_MAX;
+}
+
+float Sensor_ReadLightLux(SensorStatus *status)
+{
+    uint16_t raw = adc_dma_buf[1];
+    SlidingFilter_Update(&light_filter, raw);
+    uint16_t f = SlidingFilter_GetAvg(&light_filter);
+
+    if (f <= 5)
+    {
+        *status = SENSOR_ERR_ADC_UNDERVOLTAGE;
+        return 0.0f;
+    }
+    if (f >= 4090)
+    {
+        *status = SENSOR_ERR_ADC_OVERVOLTAGE;
+        return 10000.0f;
+    }
+
+    *status = SENSOR_OK;
+
+    /* Linear mapping from 0..ADC_MAX to 0..10000 lx according to the test-plan
+       calibration. This avoids treating percentage as lux. */
+    return ((float)f / ADC_MAX) * 10000.0f;
 }
 
 void Sensor_ResetFilters(void)
@@ -101,6 +131,3 @@ void Sensor_ResetFilters(void)
     SlidingFilter_Init(&temp_filter);
     SlidingFilter_Init(&light_filter);
 }
-
-//uint16_t Sensor_GetRawTempADC(void)  { return adc_dma_buf[0]; }
-//uint16_t Sensor_GetRawLightADC(void) { return adc_dma_buf[1]; }
