@@ -41,6 +41,7 @@
 #include "buzzer.h"
 #include "control.h"  // 提供 atoi
 #include "bsp_key.h"
+#include "mqtt_port.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -74,7 +75,7 @@ volatile uint16_t adc_dma_buf[2];
 #define RX_BUF_SIZE 64
 uint8_t rx_buf[RX_BUF_SIZE];
 uint8_t rx_index = 0;
-volatile uint8_t rx_cmd_ready = 0;   // 收到完整一行命令
+volatile uint8_t rx_cmd_ready = 0;   // 收到完整一行命�?
 
 typedef struct {
     float temperature_c;
@@ -141,9 +142,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart == &huart1) {
         if (rx_buf[rx_index] == '\r' || rx_buf[rx_index] == '\n') {
-            rx_buf[rx_index] = '\0';          // 终止字符串
+            rx_buf[rx_index] = '\0';          // 终止字符�?
             if (rx_index > 0) {
-                rx_cmd_ready = 1;             // 通知主循环处理
+                rx_cmd_ready = 1;             // 通知主循环处�?
             }
             rx_index = 0;
         } else {
@@ -152,7 +153,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
                 rx_index = 0;                 // 溢出保护
             }
         }
-        HAL_UART_Receive_IT(&huart1, &rx_buf[rx_index], 1); // 重新启动接收下一个字节
+        HAL_UART_Receive_IT(&huart1, &rx_buf[rx_index], 1); // 重新启动接收下一个字�?
     }
 }
 
@@ -214,7 +215,7 @@ int main(void)
 	
 	printf("System Start! ADC DMA running...\r\n");
 	
-	OLED_Init();          // 初始化 OLED
+	OLED_Init();          // 初始�?OLED
 	OLED_Clear();
 	OLED_ShowString(0, 0, "RTOS Tasks");  // 标题
 	HAL_Delay(1000);
@@ -233,7 +234,7 @@ osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.
 // 同步对象创建
 
 sensor_data_mutex = osMutexNew(NULL);
-display_sem = osSemaphoreNew(1, 0, NULL);   // 初始计数 0，显示任务等待第一次采集
+display_sem = osSemaphoreNew(1, 0, NULL);   // 初始计数 0，显示任务等待第一次采�?
 data_sem = display_sem;
 printf_mutex = osMutexNew(NULL);
 	
@@ -263,7 +264,8 @@ osThreadNew(vTask_Acquisition, NULL, &attr);
 
 // 云通信任务 (Normal)
 attr.name = "Cloud";
-attr.stack_size = 512;   // 后续 MQTT 需要较大栈
+attr.stack_size = 1536;   // 后续 MQTT 需要较大栈
+attr.priority = osPriorityAboveNormal;
 osThreadNew(vTask_Cloud, NULL, &attr);
 
 // 显示任务 (最低优先级)
@@ -318,7 +320,7 @@ osThreadNew(vTask_Display, NULL, &attr);
 {
     printf("Key pressed!\r\n");
 }
-        // 这里可以添加模式切换或唤醒操作
+        // 这里可以添加模式切换或唤醒操�?
 		HAL_Delay(200);   // 5Hz 循环 
   
   }    */
@@ -421,17 +423,17 @@ void vTask_Acquisition(void *argument)
 {
     (void)argument;
 
-    // 前期等待传感器稳定
+    // 前期等待传感器稳�?
     osDelay(100);
 
     for(;;)
     {
-        // 若 DMA 缓冲区连续 3 次为 0，则强制重启 DMA
+        // �?DMA 缓冲区连�?3 次为 0，则强制重启 DMA
         static uint8_t zero_cnt = 0;
         if (adc_dma_buf[0] == 0 && adc_dma_buf[1] == 0) {
             zero_cnt++;
             if (zero_cnt >= 3) {
-                // 重新初始化 DMA
+                // 重新初始�?DMA
                 HAL_ADC_Stop_DMA(&hadc1);
                 HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buf, 2);
                 zero_cnt = 0;
@@ -457,7 +459,8 @@ void vTask_Acquisition(void *argument)
         osMutexRelease(sensor_data_mutex);
 
         osSemaphoreRelease(display_sem);
-
+ 
+		
         // 500ms 一次把采集结果按要求打印成单行格式
         osMutexAcquire(printf_mutex, osWaitForever);
         printf("Temp: ADC=%u, %.1f C  |  Light: ADC=%u, %.1f %%\r\n",
@@ -515,17 +518,88 @@ void vTask_Control(void *argument)
 
 void vTask_Cloud(void *argument)
 {
-	  
-	
-    for(;;)
+    TickType_t last_pub;
+    float      temp;
+    uint16_t   light;
+    uint8_t    alarm;
+    int        rc;
+    uint8_t    sub_retry = 0U;   /* subscribe retry counter */
+
+    (void)argument;
+
+    /* ESP-01S USART2 DMA + IDLE + semaphore init, paho MQTT client init */
+    mqtt_init();
+    last_pub = xTaskGetTickCount();
+
+    /* cloud task state machine:
+       WIFI_READY -> TCP_READY -> MQTT_READY -> SUBSCRIBED (then publish allowed) */
+    for (;;)
     {
-        osMutexAcquire(printf_mutex, osWaitForever);
-		printf("[CLOUD] Cloud task running\r\n");
-		osMutexRelease(printf_mutex);
-		
-        osDelay(2000);
+        /* ---- state < MQTT_READY: full connect (WiFi -> TCP transparent -> CONNACK),
+               failure triggers reconnect, module reset only if AT totally dead ---- */
+        if (mqtt_get_state() < MQTT_STATE_MQTT_READY)
+        {
+            rc = mqtt_connect();
+            if (rc == 0)
+            {
+                printf("[MQTT] connected to %s:%u\r\n", MQTT_BROKER_HOST, (unsigned int)MQTT_BROKER_PORT);
+                /* subscribe only after MQTT handshake done; success -> SUBSCRIBED */
+                rc = mqtt_subscribe_cmd_topic();
+                if (rc != 0)
+                {
+                    sub_retry++;
+                    printf("[MQTT] subscribe retry %u rc=%d (%s)\r\n", (unsigned int)sub_retry, rc, mqtt_err_str(rc));
+                    mqtt_disconnect();
+                    osDelay(3000);
+                    continue;
+                }
+                sub_retry = 0U;
+            }
+            else
+            {
+                printf("[MQTT] connect failed rc=%d (%s), retry in 3s...\r\n", rc, mqtt_err_str(rc));
+                osDelay(3000);
+                continue;
+            }
+        }
+
+        /* ---- continuous MQTTYield in while(1): receives late CONNACK/SUBACK/downlink
+               PUBLISH and sends keepalive PINGREQ; must NOT be called only once ---- */
+        rc = mqtt_yield(20);
+        if (rc != 0)
+        {
+            printf("[MQTT] yield/link lost rc=%d (%s), reconnecting...\r\n", rc, mqtt_err_str(rc));
+            mqtt_disconnect();
+            continue;
+        }
+
+        /* ---- publish telemetry every 2000ms only in SUBSCRIBED state ---- */
+        if (mqtt_get_state() >= MQTT_STATE_SUBSCRIBED)
+        {
+            if ((TickType_t)(xTaskGetTickCount() - last_pub) >= pdMS_TO_TICKS(2000))
+            {
+                last_pub = xTaskGetTickCount();
+
+                osMutexAcquire(sensor_data_mutex, osWaitForever);
+                temp  = sensor_data.temperature_c;
+                light = (uint16_t)(((uint32_t)adc_dma_buf[1] * 100U) / 4095U);  /* ADC raw -> 0~100% */
+                alarm = sensor_data.alarm_active ? 1U : 0U;
+                osMutexRelease(sensor_data_mutex);
+
+                rc = mqtt_publish_telemetry(temp, light, alarm);
+                if (rc != 0)
+                {
+                    printf("[MQTT] publish failed rc=%d (%s), reconnecting...\r\n", rc, mqtt_err_str(rc));
+                    mqtt_disconnect();
+                    continue;
+                }
+            }
+        }
+
+        osDelay(20);
     }
 }
+
 
 void vTask_Display(void *argument)
 {

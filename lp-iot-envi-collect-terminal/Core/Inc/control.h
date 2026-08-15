@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define TEMP_THRESHOLD      35.0f
+#define TEMP_THRESHOLD      30.0f
 #define LIGHT_THRESHOLD     80.0f
 
 extern volatile uint8_t motor_duty;

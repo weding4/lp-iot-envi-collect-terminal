@@ -113,7 +113,7 @@ void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 72-1;   /* 72MHz / 72 = 1MHz -> 1MHz / 20000 = 50Hz */
+  htim3.Init.Prescaler = 144-1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 20000-1;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

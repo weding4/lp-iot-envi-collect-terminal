@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F103xB</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy;../Drivers/STM32F1xx_HAL_Driver/Inc;../Drivers/CMSIS/Device/ST/STM32F1xx/Include;../Drivers/CMSIS/Include;../Core/Src;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM3</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy;../Drivers/STM32F1xx_HAL_Driver/Inc;../Drivers/CMSIS/Device/ST/STM32F1xx/Include;../Drivers/CMSIS/Include;../Core/Src;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM3;../Middlewares/Third_Party/paho.mqtt.embedded-c/inc;../Middlewares/Third_Party/cJSON</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -462,6 +462,46 @@
               <FileName>bsp_key.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Core\Src\bsp_key.c</FilePath>
+            </File>
+            <File>
+              <FileName>esp_at.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\esp_at.c</FilePath>
+            </File>
+            <File>
+              <FileName>esp_at.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\esp_at.h</FilePath>
+            </File>
+            <File>
+              <FileName>mqtt_port.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\mqtt_port.c</FilePath>
+            </File>
+            <File>
+              <FileName>mqtt_port.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\mqtt_port.h</FilePath>
+            </File>
+            <File>
+              <FileName>json_util.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\json_util.c</FilePath>
+            </File>
+            <File>
+              <FileName>json_util.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\json_util.h</FilePath>
+            </File>
+            <File>
+              <FileName>device_ctrl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\device_ctrl.c</FilePath>
+            </File>
+            <File>
+              <FileName>device_ctrl.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\device_ctrl.h</FilePath>
             </File>
             <File>
               <FileName>main.c</FileName>
@@ -1724,6 +1764,101 @@
                   </Cads>
                 </FileArmAds>
               </FileOption>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Middlewares/paho.mqtt.embedded-c</GroupName>
+          <Files>
+            <File>
+              <FileName>MQTTClient.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTClient.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTPacket.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTPacket.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTFormat.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTFormat.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTConnectClient.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTConnectClient.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTSerializePublish.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTSerializePublish.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTDeserializePublish.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTDeserializePublish.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTSubscribeClient.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTSubscribeClient.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTUnsubscribeClient.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/src/MQTTUnsubscribeClient.c</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTClient.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/MQTTClient.h</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTPacket.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/MQTTPacket.h</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTFormat.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/MQTTFormat.h</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTConnect.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/MQTTConnect.h</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTPublish.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/MQTTPublish.h</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTSubscribe.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/MQTTSubscribe.h</FilePath>
+            </File>
+            <File>
+              <FileName>MQTTUnsubscribe.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/MQTTUnsubscribe.h</FilePath>
+            </File>
+            <File>
+              <FileName>StackTrace.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/paho.mqtt.embedded-c/inc/StackTrace.h</FilePath>
+            </File>
+            <File>
+              <FileName>cJSON.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Middlewares/Third_Party/cJSON/cJSON.c</FilePath>
+            </File>
+            <File>
+              <FileName>cJSON.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../Middlewares/Third_Party/cJSON/cJSON.h</FilePath>
             </File>
           </Files>
         </Group>

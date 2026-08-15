@@ -65,7 +65,7 @@
 #define configTICK_RATE_HZ                       ((TickType_t)1000)
 #define configMAX_PRIORITIES                     ( 56 )
 #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
-#define configTOTAL_HEAP_SIZE                    ((size_t)8192)
+#define configTOTAL_HEAP_SIZE                    ((size_t)10240)
 #define configMAX_TASK_NAME_LEN                  ( 16 )
 #define configUSE_TRACE_FACILITY                 1
 #define configUSE_16_BIT_TICKS                   0
@@ -108,11 +108,12 @@ to exclude the API function. */
 #define USE_FreeRTOS_HEAP_4
 
 /* Cortex-M specific definitions. */
-/* STM32F103 implements 4 priority bits. Hard-code a plain integer (no U
-   suffix) because the RVDS/armcc integrated assembler cannot evaluate
-   C-style suffixed constants (__NVIC_PRIO_BITS is defined as 4U in the
-   CMSIS headers) inside the __asm code of port.c. */
-#define configPRIO_BITS         4
+#ifdef __NVIC_PRIO_BITS
+ /* __BVIC_PRIO_BITS will be specified when CMSIS is being used. */
+ #define configPRIO_BITS         __NVIC_PRIO_BITS
+#else
+ #define configPRIO_BITS         4
+#endif
 
 /* The lowest interrupt priority that can be used in a call to a "set priority"
 function. */
@@ -129,7 +130,7 @@ to all Cortex-M ports, and do not rely on any particular library functions. */
 #define configKERNEL_INTERRUPT_PRIORITY 		( configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS) )
 /* !!!! configMAX_SYSCALL_INTERRUPT_PRIORITY must not be set to zero !!!!
 See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
-#define configMAX_SYSCALL_INTERRUPT_PRIORITY 	( configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS) )
+#define configMAX_SYSCALL_INTERRUPT_PRIORITY 	0x50
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
